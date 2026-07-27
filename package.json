@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "pnpm install --no-frozen-lockfile && pnpm -F sistem-antrean build",
     "dev:sbagiamu": "pnpm -F sbagiamu dev",
     "dev:kantong-mas": "pnpm -F kantong-mas dev",
     "dev:sistem-antrean": "pnpm -F sistem-antrean dev",
