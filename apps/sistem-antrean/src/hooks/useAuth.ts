@@ -127,7 +127,7 @@ export function useAuth() {
     if (profileError) {
       const msg = profileError.message.includes('unique constraint') || profileError.message.includes('duplicate key')
         ? '❌ Email sudah terdaftar.' 
-        : 'Gagal mendaftar.';
+        : `Gagal mendaftar: ${profileError.message}`;
       setState(prev => ({ ...prev, loading: false, error: msg }));
       return { error: msg };
     }
