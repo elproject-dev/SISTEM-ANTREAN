@@ -46,7 +46,7 @@ export function RegisterPage() {
     <div
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: `url('/bg_tv.png')`
+        backgroundImage: `url('${import.meta.env.BASE_URL}bg_tv.png')`
       }}
     >
       {/* Decorative background elements */}

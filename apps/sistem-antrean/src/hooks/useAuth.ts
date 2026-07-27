@@ -97,11 +97,22 @@ export function useAuth() {
 
   const signUp = useCallback(async (params: {
     email: string;
+    password?: string;
     name: string;
     phone: string;
     role?: 'admin' | 'operator';
   }): Promise<{ error: string | null }> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
+    
+    if (params.password) {
+      const { error: authError } = await db.auth.signUp({
+        email: params.email.trim(),
+        password: params.password,
+      });
+      if (authError && !authError.message.includes('User already registered')) {
+         return { error: authError.message };
+      }
+    }
     
     const { error: profileError } = await db
       .from('staff_users')

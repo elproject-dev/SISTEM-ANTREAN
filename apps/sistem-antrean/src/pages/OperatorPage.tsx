@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQueue } from '../hooks/useQueue';
 import type { OperatorSession, ServiceCode } from '../types/queue';
-import { SERVICES, LOKET_NUMBERS } from '../types/queue';
+import { LOKET_NUMBERS } from '../types/queue';
 import {
   Badge,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -126,7 +126,7 @@ function OperatorLoginForm({ onLogin }: { onLogin: (name: string, loket: number,
 
               {isServicesOpen && (
                 <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-white shadow-xl border border-slate-200 rounded-xl z-10 flex flex-col gap-1">
-                  {SERVICES.map((s) => {
+                  {state.services.map((s) => {
                     const active = services.includes(s.code);
                     return (
                       <button
@@ -314,7 +314,7 @@ function OperatorDashboard({ operator, onLogout }: { operator: OperatorSession; 
                       {currentTicket.customerName || (currentTicket.type === 'priority' ? 'Pelanggan Prioritas' : 'Pelanggan Umum')}
                     </p>
                     <p className="text-xs font-bold text-primary mt-1 uppercase tracking-wider">
-                      {SERVICES.find((s) => s.code === currentTicket.serviceCode)?.name}
+                      {state.services.find((s) => s.code === currentTicket.serviceCode)?.name}
                     </p>
                     {currentTicket.purpose && <p className="text-xs mt-1">{currentTicket.purpose}</p>}
                   </div>
@@ -419,7 +419,7 @@ function OperatorDashboard({ operator, onLogout }: { operator: OperatorSession; 
 
                         <div className="flex flex-col gap-0.5">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                            {SERVICES.find(s => s.code === t.serviceCode)?.name}
+                            {state.services.find(s => s.code === t.serviceCode)?.name}
                           </span>
                           {t.customerName && (
                             <span className="text-[11px] font-bold text-primary mt-0.5">{t.customerName}</span>
@@ -500,7 +500,7 @@ function OperatorDashboard({ operator, onLogout }: { operator: OperatorSession; 
                       </td>
                       <td className="px-4 py-3 border border-white/40 text-sm font-medium text-slate-700">
                         <div className="flex items-center gap-2">
-                          {SERVICES.find(s => s.code === t.serviceCode)?.name}
+                          {state.services.find(s => s.code === t.serviceCode)?.name}
                         </div>
                       </td>
                       <td className="px-4 py-3 border border-white/40 text-center text-sm font-medium text-slate-600">
@@ -527,7 +527,7 @@ export function OperatorPage() {
   const { registerOperator, state } = useQueue();
   const [operator, setOperator] = useState<OperatorSession | null>(() => {
     try {
-      const s = sessionStorage.getItem('operator_v2');
+      const s = localStorage.getItem('operator_v2');
       if (!s) return null;
       return JSON.parse(s) as OperatorSession;
     } catch { return null; }
@@ -543,7 +543,7 @@ export function OperatorPage() {
     try {
       const op = await registerOperator(name, loket, services);
       setOperator(op);
-      sessionStorage.setItem('operator_v2', JSON.stringify(op));
+      localStorage.setItem('operator_v2', JSON.stringify(op));
     } catch (err) {
       console.error('[OperatorPage] Login gagal:', err);
       alert('Gagal masuk sebagai operator. Coba lagi.');
@@ -551,7 +551,7 @@ export function OperatorPage() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('operator_v2');
+    localStorage.removeItem('operator_v2');
     setOperator(null);
   };
 
