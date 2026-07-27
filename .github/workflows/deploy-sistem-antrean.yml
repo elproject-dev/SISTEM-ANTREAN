@@ -35,7 +35,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build sistem-antrean
-        run: pnpm -F sistem-antrean build
+        run: pnpm -F sistem-antrean exec vite build
         env:
           VITE_SUPABASE_URL: https://wnozfcqgcmvxvkxbxgfj.supabase.co
           VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indub3pmY3FnY212eHZreGJ4Z2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNDIwMjMsImV4cCI6MjA5ODkxODAyM30.00v4HUxsKgNxupMPdWMo6XeWxWKrX7B7qRXhoh1cttg
