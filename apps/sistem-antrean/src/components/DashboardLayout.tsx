@@ -67,7 +67,7 @@ export function DashboardLayout({ route, children }: DashboardLayoutProps) {
   return (
     <div 
       className="flex min-h-screen w-full bg-cover bg-center bg-no-repeat overflow-hidden"
-      style={{ backgroundImage: 'url(/bg_tv.png)' }}
+      style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg_tv.png')` }}
     >
       <TooltipProvider delayDuration={0}>
         {/* ── Desktop Sidebar (Icons Only) ── */}

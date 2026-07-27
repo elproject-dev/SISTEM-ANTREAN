@@ -116,7 +116,7 @@ export function TVPage() {
           height: '1080px', 
           transform: `scale(${scale})`, 
           transformOrigin: 'center center',
-          backgroundImage: 'url(/bg_tv.png)' 
+          backgroundImage: `url('${import.meta.env.BASE_URL}bg_tv.png')`
         }}
       >
       {/* Dark overlay for better contrast */}
