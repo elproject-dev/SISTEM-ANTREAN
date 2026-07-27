@@ -1,0 +1,469 @@
+import { Sidebar } from "@/components/layout/Sidebar";
+import { useDeleteTransaction, useGetTransaction, useStoreSettings } from "@workspace/api-client-react";
+import { formatRupiah, formatDate, formatInvoiceNumber } from "@/lib/formatters";
+import { useParams, Link, useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Printer, Receipt, Trash2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { ADMIN_EMAIL } from "@/lib/auth";
+import {
+  connectToPrinter,
+  disconnectPrinter,
+  printReceipt,
+  getBluetoothPrinterMac,
+  isBluetoothAvailable
+} from "@/lib/bluetooth-printer";
+import { isTauriDesktop, printTauriReceipt, isTauriPrinterReady } from "@/lib/tauri-bluetooth-printer";
+import {
+  showPrinterNotConnectedNotification,
+  showPrintSuccessNotification
+} from "@/lib/android-notifications";
+
+
+
+export default function TransactionDetailPage() {
+  const params = useParams();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const id = parseInt(params.id || "0");
+  const { data: storeSettingsData, isLoading: isLoadingStore } = useStoreSettings();
+  
+  const storeInfo = {
+    name: storeSettingsData?.name || 'KANTONG-MAS',
+    address: storeSettingsData?.address || '',
+    phone: storeSettingsData?.phone || '',
+    showFooter: storeSettingsData?.show_footer ?? true,
+    footerMessage: storeSettingsData?.footer_message || '',
+    footerMessage2: storeSettingsData?.footer_message2 || '',
+    footerMessage3: storeSettingsData?.footer_message3 || ''
+  };
+  const [enablePPN, setEnablePPN] = useState(() => {
+    return localStorage.getItem('enablePPN') === 'true';
+  });
+
+  // Check if user is admin (only kantongmas1919@gmail.com)
+  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+  const { data: trx, isLoading } = useGetTransaction(id);
+  const deleteTransaction = useDeleteTransaction();
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const displayedStoreName = storeInfo.name;
+  const displayedAddress = storeInfo.address;
+  const displayedPhone = storeInfo.phone || '';
+
+  const displayedFooter1 = trx?.outlets?.footer_message || storeInfo.footerMessage;
+  const displayedFooter2 = trx?.outlets?.footer_message2 || storeInfo.footerMessage2;
+  const displayedFooter3 = trx?.outlets?.footer_message3 || storeInfo.footerMessage3;
+
+  const handlePrintReceipt = async () => {
+    if (!trx) return;
+
+    // ── Tauri Desktop: gunakan printTauriReceipt ──
+    if (isTauriDesktop()) {
+      if (!isTauriPrinterReady()) {
+        void showPrinterNotConnectedNotification('Printer Desktop belum dipilih. Buka Pengaturan \u2192 Printer Desktop (Tauri) untuk memilih printer.');
+        return;
+      }
+      setIsPrinting(true);
+      try {
+        const receiptCustomerName = trx.customers?.name || trx.customerName || trx.customer_name || "Umum";
+        const items = trx.transaction_items?.map((item: any) => ({
+          productId: item.product_id,
+          productName: item.product_name,
+          quantity: item.quantity,
+          price: item.price
+        })) || [];
+        const total = (trx.subtotal || 0) + (trx.tax || 0) - (trx.discount || 0);
+        const showFooter = localStorage.getItem('showFooter') !== 'false';
+
+        const printData = {
+          ...trx,
+          cashierName: trx.cashier_name,
+          items,
+          tax: trx.tax || 0,
+          ppnPercentage: 11,
+          discount: trx.discount || 0,
+          discountNote: trx.discount_note || '',
+          customerName: receiptCustomerName,
+          total: total,
+          amountPaid: trx.amount_paid || 0,
+          change: trx.change || 0,
+          paymentMethod: trx.payment_method || 'cash',
+          storeName: displayedStoreName,
+          storeAddress: displayedAddress,
+          storePhone: displayedPhone,
+          footerMessage: showFooter ? (trx?.outlets?.footer_message || localStorage.getItem('footerMessage') || '') : '',
+          footerMessage2: showFooter ? (trx?.outlets?.footer_message2 || localStorage.getItem('footerMessage2') || '') : '',
+          footerMessage3: showFooter ? (trx?.outlets?.footer_message3 || localStorage.getItem('footerMessage3') || '') : '',
+        };
+
+        console.log('[Tauri] Printing receipt via Tauri...', printData);
+        const result = await printTauriReceipt(printData);
+        if (!result.success) {
+          void showPrinterNotConnectedNotification(result.message);
+        } else {
+          void showPrintSuccessNotification(total, formatInvoiceNumber(trx.id));
+        }
+      } catch (error) {
+        console.error('[Tauri] Print error:', error);
+        void showPrinterNotConnectedNotification(
+          error instanceof Error ? error.message : 'Terjadi kesalahan saat mencetak struk.'
+        );
+      } finally {
+        setIsPrinting(false);
+      }
+      return;
+    }
+
+    // ── Android / Mobile: alur Bluetooth lama ──
+    if (!isBluetoothAvailable()) {
+      console.error('Bluetooth plugin not available');
+      void showPrinterNotConnectedNotification('Plugin Bluetooth tidak tersedia di perangkat ini.');
+      return;
+    }
+
+    const printerMac = getBluetoothPrinterMac();
+    if (!printerMac) {
+      console.error('Printer MAC not set');
+      void showPrinterNotConnectedNotification('Alamat MAC printer belum diatur di pengaturan.');
+      return;
+    }
+
+    setIsPrinting(true);
+    try {
+
+      const receiptCustomerName = trx.customers?.name || trx.customerName || trx.customer_name || "Umum";
+
+      const items = trx.transaction_items?.map((item: any) => ({
+        productId: item.product_id,
+        productName: item.product_name,
+        quantity: item.quantity,
+        price: item.price
+      })) || [];
+
+      const total = (trx.subtotal || 0) + (trx.tax || 0) - (trx.discount || 0);
+
+      const showFooter = localStorage.getItem('showFooter') !== 'false';
+      const printData = {
+        ...trx,
+        cashierName: trx.cashier_name,
+        items,
+        tax: trx.tax || 0,
+        ppnPercentage: 11,
+        discount: trx.discount || 0,
+        discountNote: trx.discount_note || '',
+        customerName: receiptCustomerName,
+        total: total,
+        amountPaid: trx.amount_paid || 0,
+        change: trx.change || 0,
+        paymentMethod: trx.payment_method || 'cash',
+        storeName: displayedStoreName,
+        storeAddress: displayedAddress,
+        storePhone: displayedPhone,
+        footerMessage: showFooter ? (trx?.outlets?.footer_message || localStorage.getItem('footerMessage') || '') : '',
+        footerMessage2: showFooter ? (trx?.outlets?.footer_message2 || localStorage.getItem('footerMessage2') || '') : '',
+        footerMessage3: showFooter ? (trx?.outlets?.footer_message3 || localStorage.getItem('footerMessage3') || '') : '',
+      };
+
+      console.log('Connecting to printer...', printerMac);
+      const connectionResult = await connectToPrinter(printerMac);
+      if (!connectionResult.success) {
+        console.error('Connection failed:', connectionResult.message);
+        void showPrinterNotConnectedNotification(connectionResult.message);
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Printing receipt...', printData);
+
+      const printed = await printReceipt(printData);
+      if (!printed) {
+        console.error('Print failed');
+        void showPrinterNotConnectedNotification('Gagal mencetak struk. Pastikan printer menyala dan terhubung.');
+      } else {
+        const total = (trx.subtotal || 0) + (trx.tax || 0) - (trx.discount || 0);
+        void showPrintSuccessNotification(total, formatInvoiceNumber(trx.id));
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await disconnectPrinter();
+    } catch (error) {
+      console.error('Print error:', error);
+      void showPrinterNotConnectedNotification(
+        error instanceof Error ? error.message : 'Terjadi kesalahan saat mencetak struk.'
+      );
+      try {
+        await disconnectPrinter();
+      } catch (disconnectError) {
+        console.error('Error during disconnect:', disconnectError);
+      }
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  useEffect(() => {
+    const syncStoreInfo = () => {
+
+      setEnablePPN(localStorage.getItem('enablePPN') === 'true');
+    };
+
+    syncStoreInfo();
+    window.addEventListener('storage', syncStoreInfo);
+    window.addEventListener('storeSettingsChanged', syncStoreInfo);
+
+    return () => {
+      window.removeEventListener('storage', syncStoreInfo);
+      window.removeEventListener('storeSettingsChanged', syncStoreInfo);
+    };
+  }, []);
+
+  if (isLoading || isLoadingStore) return <Sidebar><div className="p-4 sm:p-8">Memuat...</div></Sidebar>;
+  if (!trx) return <Sidebar><div className="p-4 sm:p-8">Transaksi tidak ditemukan</div></Sidebar>;
+
+  const getPaymentLabel = (method?: string) => {
+    switch (method) {
+      case 'cash': return 'Tunai';
+      case 'qris': return 'QRIS';
+      case 'transfer':
+      case 'e_wallet':
+        return 'Transfer';
+      case 'debit_card': return 'Debit';
+      case 'credit_card': return 'Kredit';
+      default: return method?.replace('_', ' ') || '-';
+    }
+  };
+
+
+  const displayedTax = trx.tax || 0;
+  const total = (trx.subtotal || 0) + displayedTax - (trx.discount || 0);
+
+  const handleDelete = () => {
+    if (!confirm(`Hapus transaksi ${formatInvoiceNumber(trx.id)}? Tindakan ini tidak bisa dibatalkan.`)) {
+      return;
+    }
+
+    deleteTransaction.mutate(
+      { id: trx.id },
+      {
+        onSuccess: () => {
+          toast({ title: "Transaksi dihapus", description: "Data transaksi berhasil dihapus." });
+          setLocation("/transactions");
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Gagal menghapus transaksi",
+            description: error?.message || "Periksa izin delete pada Supabase.",
+            variant: "destructive"
+          });
+        }
+      }
+    );
+  };
+
+  return (
+    <Sidebar>
+      <div className="flex-1 flex flex-col h-full bg-slate-50">
+        {/* Header */}
+        <div className="p-4 sm:p-6 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link href="/transactions">
+              <Button variant="outline" size="icon" className="rounded-full h-9 w-9 sm:h-10 sm:w-10">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            </Link>
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-900 truncate">
+              Invoice {formatInvoiceNumber(trx.id)}
+            </h1>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={handlePrintReceipt}
+              disabled={isPrinting}
+              className="w-full sm:w-auto"
+            >
+              {isPrinting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                  Mencetak...
+                </>
+              ) : (
+                <>
+                  <Printer className="w-4 h-4 mr-2" /> Cetak Struk
+                </>
+              )}
+            </Button>
+            {isAdmin && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleteTransaction.isPending}
+                className="w-full sm:w-auto"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deleteTransaction.isPending ? "Menghapus..." : "Hapus"}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Receipt Card */}
+        <div className="p-4 sm:p-6 flex-1 overflow-auto flex justify-center">
+          <Card className="w-full max-w-lg shadow-lg border-slate-200 my-2 sm:my-4 h-max printable-receipt">
+            <CardContent className="p-4 sm:p-8">
+              {/* Header */}
+              <div className="mb-4 sm:mb-6 pb-4 sm:pb-6 border-b-2 border-dashed border-slate-200">
+                {/* Store Name - Centered */}
+                <div className="text-center mb-4">
+                  <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">{displayedStoreName}</h2>
+                  <p className="text-xs text-slate-500 mt-1">{displayedAddress}</p>
+                  {displayedPhone && (
+                    <p className="text-xs text-slate-400 mt-0.5">{displayedPhone}</p>
+                  )}
+                </div>
+                {/* Date/Time - Invoice Row */}
+                <div className="flex justify-between items-start">
+                  <div className="text-left">
+                    <p className="text-xs sm:text-sm text-slate-600 font-medium">
+                      {new Date(trx.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {new Date(trx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs sm:text-sm text-slate-600 font-medium font-mono">{formatInvoiceNumber(trx.id)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{trx.cashier_name}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction Info */}
+              <div className="space-y-3 mb-4 sm:mb-6">
+                {/* Status - Above Customer */}
+                <div className="flex justify-between items-center">
+                  <span className="text-xs sm:text-sm text-slate-500">Status</span>
+                  {trx.payment_status === 'partial' ? (
+                    <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-medium">DP</Badge>
+                  ) : trx.payment_status === 'unpaid' ? (
+                    <Badge variant="destructive" className="font-medium">TEMPO</Badge>
+                  ) : (
+                    <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium">LUNAS</Badge>
+                  )}
+                </div>
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-slate-500">Pelanggan</span>
+                  <span className="font-medium text-right">{trx.customers?.name || "-"}</span>
+                </div>
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-slate-500">Metode</span>
+                  <span className="font-medium">{getPaymentLabel(trx.payment_method)}</span>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="py-3 sm:py-4 border-y-2 border-dashed border-slate-200 space-y-3 sm:space-y-4 font-mono text-xs sm:text-sm">
+                {trx.transaction_items?.map((item: any) => (
+                  <div key={item.id} className="flex justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900 break-words">{item.product_name}</p>
+                      <p className="text-slate-500 mt-0.5 text-xs">{item.quantity} x {formatRupiah(item.price)}</p>
+                    </div>
+                    <p className="font-bold text-slate-900 whitespace-nowrap text-right">{formatRupiah(item.subtotal)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Summary */}
+              <div className="space-y-2 py-4 sm:py-6 font-mono text-xs sm:text-sm border-b-2 border-dashed border-slate-200">
+                <div className="flex justify-between text-slate-600">
+                  <span>Subtotal</span>
+                  <span>{formatRupiah(trx.subtotal)}</span>
+                </div>
+                {trx.tax && trx.tax > 0 ? (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Pajak (11%)</span>
+                    <span>{formatRupiah(trx.tax)}</span>
+                  </div>
+                ) : null}
+                {trx.discount && trx.discount > 0 ? (
+                  <div className="flex justify-between text-destructive">
+                    <span>Diskon</span>
+                    <span>-{formatRupiah(trx.discount)}</span>
+                  </div>
+                ) : null}
+
+                <div className="flex justify-between font-bold text-sm sm:text-lg pt-3 sm:pt-4">
+                  <span className="text-slate-900">TOTAL</span>
+                  <span className="text-primary">{formatRupiah(total)}</span>
+                </div>
+              </div>
+
+              {/* Payment Details */}
+              {trx.payment_status === 'paid' && trx.payment_method === 'cash' && (
+                <div className="space-y-2 py-4 sm:py-6 font-mono text-xs sm:text-sm border-b-2 border-dashed border-slate-200">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Tunai</span>
+                    <span>{formatRupiah(trx.amount_paid || 0)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-900">
+                    <span>Kembali</span>
+                    <span>{formatRupiah(trx.change || 0)}</span>
+                  </div>
+                </div>
+              )}
+
+              {trx.payment_status === 'partial' && (
+                <div className="space-y-2 py-4 sm:py-6 font-mono text-xs sm:text-sm border-b-2 border-dashed border-slate-200">
+                  <div className="flex justify-between text-slate-600">
+                    <span>DP Dibayar ({getPaymentLabel(trx.payment_method)})</span>
+                    <span>{formatRupiah(trx.amount_paid || 0)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-900">
+                    <span>Sisa Tagihan</span>
+                    <span className="text-red-600">{formatRupiah(trx.remaining_balance || 0)}</span>
+                  </div>
+                </div>
+              )}
+
+              {trx.payment_status === 'unpaid' && (
+                <div className="space-y-2 py-4 sm:py-6 font-mono text-xs sm:text-sm border-b-2 border-dashed border-slate-200">
+                  <div className="flex justify-between font-bold text-slate-900">
+                    <span>Tagihan (Tempo)</span>
+                    <span className="text-red-600">{formatRupiah(trx.remaining_balance || 0)}</span>
+                  </div>
+                  {trx.due_date && (
+                    <div className="flex justify-between text-slate-600 mt-1">
+                      <span>Jatuh Tempo</span>
+                      <span>{new Date(trx.due_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+
+
+
+
+              {/* Footer */}
+              {storeInfo.showFooter && (
+                <div className="mt-6 sm:mt-8 text-center text-slate-400 text-xs space-y-1">
+                  {displayedFooter1 && <p>{displayedFooter1}</p>}
+                  {displayedFooter2 && <p>{displayedFooter2}</p>}
+                  {displayedFooter3 && <p>{displayedFooter3}</p>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </Sidebar>
+  );
+}

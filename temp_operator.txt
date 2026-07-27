@@ -1,0 +1,116 @@
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Kanan: Tabel Riwayat & Stats ── */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Stats Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KpiCard
+              title="Total Dilayani"
+              value={liveOp.totalServed}
+              gradientClass="bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-500"
+              icon={<CheckCircle2 className="w-4 h-4 text-white" />}
+            />
+            <KpiCard
+              title="Dilewati"
+              value={liveOp.totalSkipped}
+              gradientClass="bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500"
+              icon={<XCircle className="w-4 h-4 text-white" />}
+            />
+            <KpiCard
+              title="Rata-rata Waktu"
+              value={avgSeconds > 0 ? (avgSeconds < 60 ? `${avgSeconds}d` : `${Math.floor(avgSeconds / 60)}m ${avgSeconds % 60}d`) : '—'}
+              gradientClass="bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600"
+              icon={<Clock className="w-4 h-4 text-white" />}
+            />
+          </div>
+
+          {/* History Table */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[500px]">
+            <div className="p-4 border-b border-slate-200 bg-white">
+              <h2 className="font-bold text-slate-800 text-lg">Riwayat Pelayanan Loket {liveOp.loket}</h2>
+              <p className="text-xs text-slate-500 font-medium mt-1">Daftar antrean yang sudah Anda tangani hari ini</p>
+            </div>
+            
+            <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1">
+              <table className="w-full text-left border-collapse min-w-[500px]">
+                <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
+                  <tr className="text-slate-500 text-[10px] uppercase tracking-wider">
+                    <th className="px-4 py-3 font-bold border-b border-slate-200 w-16 text-center">WAKTU</th>
+                    <th className="px-4 py-3 font-bold border-b border-slate-200 text-center w-24">TIKET</th>
+                    <th className="px-4 py-3 font-bold border-b border-slate-200">PELANGGAN</th>
+                    <th className="px-4 py-3 font-bold border-b border-slate-200 text-center">DURASI</th>
+                    <th className="px-4 py-3 font-bold border-b border-slate-200 text-center">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {servedToday.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-12 text-center text-slate-500 border-b border-slate-200">
+                        <p className="font-bold text-base text-slate-600 mb-1">Belum ada riwayat</p>
+                        <p className="text-xs">Anda belum melayani pelanggan hari ini.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    servedToday.slice().reverse().map((t) => {
+                      const time = new Date(t.takenAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                      const dur = t.doneAt && t.calledAt
+                          ? Math.round((t.doneAt - t.calledAt) / 1000)
+                          : null;
+                      const sc = STATUS_LABEL[t.status] ?? { label: t.status, variant: 'slate' as BadgeVariant };
+                      
+                      return (
+                        <tr key={t.id} className="transition-colors hover:bg-slate-50">
+                          <td className="px-4 py-3 border-b border-slate-200 text-center text-xs font-semibold text-slate-600">
+                            {time}
+                          </td>
+                          <td className="px-4 py-3 border-b border-slate-200 text-center">
+                            <span className="font-black text-base text-primary">{t.displayNumber}</span>
+                          </td>
+                          <td className="px-4 py-3 border-b border-slate-200">
+                            <div className="font-bold text-slate-800 text-xs">
+                              {t.customerName || 'Umum'}
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                              {SERVICES.find(s => s.code === t.serviceCode)?.name}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 border-b border-slate-200 text-center text-xs font-medium text-slate-600">
+                            {dur !== null ? (dur < 60 ? `${dur}d` : `${Math.floor(dur / 60)}m ${dur % 60}d`) : '-'}
+                          </td>
+                          <td className="px-4 py-3 border-b border-slate-200 text-center">
+                            <CustomStatusBadge variant={sc.variant} label={sc.label} />
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+export function OperatorPage() {
+  const { registerOperator, state } = useQueue();
+  const [operator, setOperator] = useState<OperatorSession | null>(() => {
+    try {
+      const s = sessionStorage.getItem('operator_v2');
+      if (!s) return null;
+      const op = JSON.parse(s) as OperatorSession;
+      return state.operators.find((o) => o.id === op.id) ?? null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    if (!operator) return;
+    const live = state.operators.find((o) => o.id === operator.id);
+    if (live) setOperator(live);

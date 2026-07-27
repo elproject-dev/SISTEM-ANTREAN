@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Redirecting...</title>
+  <script type="text/javascript">
+    var path = window.location.pathname;
+    var repo = '/KANTONG-MAS/';
+    var isGithubPages = path.toLowerCase().indexOf(repo.toLowerCase()) === 0;
+    var redirectUrl = window.location.origin + (isGithubPages ? repo : '/');
+
+    sessionStorage.redirect = window.location.href;
+    window.location.replace(redirectUrl);
+  </script>
+</head>
+
+<body>
+  Redirecting to the main page...
+</body>
+
+</html>

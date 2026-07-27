@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kantong Mas Idaman</string>
+    <string name="title_activity_main">Kantong Mas Idaman</string>
+    <string name="package_name">com.kantongmas.app</string>
+    <string name="custom_url_scheme">com.kantongmas.app</string>
+</resources>
