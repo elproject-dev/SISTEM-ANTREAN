@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS "sistem-antrean".services (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-DROP TRIGGER IF EXISTS services_updated_at ON "sistem-antrean".services;
 CREATE TRIGGER services_updated_at
   BEFORE UPDATE ON "sistem-antrean".services
   FOR EACH ROW EXECUTE FUNCTION "sistem-antrean".set_updated_at();
@@ -43,7 +42,6 @@ CREATE TABLE IF NOT EXISTS "sistem-antrean".counters (
   PRIMARY KEY (service_code, date)
 );
 
-DROP TRIGGER IF EXISTS counters_updated_at ON "sistem-antrean".counters;
 CREATE TRIGGER counters_updated_at
   BEFORE UPDATE ON "sistem-antrean".counters
   FOR EACH ROW EXECUTE FUNCTION "sistem-antrean".set_updated_at();
@@ -62,7 +60,6 @@ CREATE TABLE IF NOT EXISTS "sistem-antrean".staff_users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-DROP TRIGGER IF EXISTS staff_users_updated_at ON "sistem-antrean".staff_users;
 CREATE TRIGGER staff_users_updated_at
   BEFORE UPDATE ON "sistem-antrean".staff_users
   FOR EACH ROW EXECUTE FUNCTION "sistem-antrean".set_updated_at();
@@ -86,7 +83,6 @@ CREATE TABLE IF NOT EXISTS "sistem-antrean".operator_sessions (
   UNIQUE (loket)  -- satu loket hanya satu operator aktif
 );
 
-DROP TRIGGER IF EXISTS operator_sessions_updated_at ON "sistem-antrean".operator_sessions;
 CREATE TRIGGER operator_sessions_updated_at
   BEFORE UPDATE ON "sistem-antrean".operator_sessions
   FOR EACH ROW EXECUTE FUNCTION "sistem-antrean".set_updated_at();
@@ -119,7 +115,6 @@ CREATE TABLE IF NOT EXISTS "sistem-antrean".tickets (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-DROP TRIGGER IF EXISTS tickets_updated_at ON "sistem-antrean".tickets;
 CREATE TRIGGER tickets_updated_at
   BEFORE UPDATE ON "sistem-antrean".tickets
   FOR EACH ROW EXECUTE FUNCTION "sistem-antrean".set_updated_at();
@@ -139,7 +134,6 @@ CREATE TABLE IF NOT EXISTS "sistem-antrean".running_texts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-DROP TRIGGER IF EXISTS running_texts_updated_at ON "sistem-antrean".running_texts;
 CREATE TRIGGER running_texts_updated_at
   BEFORE UPDATE ON "sistem-antrean".running_texts
   FOR EACH ROW EXECUTE FUNCTION "sistem-antrean".set_updated_at();
@@ -192,9 +186,13 @@ CREATE POLICY "allow_write_operator_sessions" ON "sistem-antrean".operator_sessi
 CREATE POLICY "allow_write_running_texts" ON "sistem-antrean".running_texts
   FOR ALL TO authenticated USING (TRUE) WITH CHECK (TRUE);
 
--- Policy staff_users: semua user login bisa melihat profil staff (diperlukan untuk list admin)
-CREATE POLICY "allow_read_staff" ON "sistem-antrean".staff_users
-  FOR SELECT TO authenticated USING (TRUE);
+-- Policy staff_users: user hanya bisa lihat/edit profilnya sendiri, admin bisa semua
+CREATE POLICY "allow_read_own_staff" ON "sistem-antrean".staff_users
+  FOR SELECT TO authenticated
+  USING (auth_id = auth.uid() OR EXISTS (
+    SELECT 1 FROM "sistem-antrean".staff_users su
+    WHERE su.auth_id = auth.uid() AND su.role = 'admin' AND su.status = 'active'
+  ));
 
 CREATE POLICY "allow_insert_staff" ON "sistem-antrean".staff_users
   FOR INSERT TO authenticated WITH CHECK (auth_id = auth.uid());

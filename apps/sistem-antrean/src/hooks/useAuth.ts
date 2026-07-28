@@ -67,7 +67,16 @@ export function useAuth() {
       }
     };
     init();
-    return () => { mounted = false; };
+
+    const handleAuthChange = () => {
+      init();
+    };
+    window.addEventListener('auth-changed', handleAuthChange);
+
+    return () => { 
+      mounted = false; 
+      window.removeEventListener('auth-changed', handleAuthChange);
+    };
   }, [loadStaffProfile]);
 
   const signIn = useCallback(async (email: string, password?: string): Promise<{ error: string | null }> => {
@@ -100,6 +109,7 @@ export function useAuth() {
       };
       localStorage.setItem(AUTH_STORAGE_KEY, rootProfile.id);
       setState({ user: rootProfile, staffProfile: rootProfile, loading: false, error: null });
+      window.dispatchEvent(new Event('auth-changed'));
       return { error: null };
     }
 
@@ -127,6 +137,7 @@ export function useAuth() {
 
     localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
     setState({ user: profile, staffProfile: profile, loading: false, error: null });
+    window.dispatchEvent(new Event('auth-changed'));
     return { error: null };
   }, [loadStaffProfile]);
 
@@ -139,19 +150,25 @@ export function useAuth() {
   }): Promise<{ error: string | null }> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
+    let authId: string | undefined;
+
     if (params.password) {
-      const { error: authError } = await db.auth.signUp({
+      const { data: authData, error: authError } = await db.auth.signUp({
         email: params.email.trim(),
         password: params.password,
       });
       if (authError && !authError.message.includes('User already registered')) {
         return { error: authError.message };
       }
+      if (authData?.user) {
+        authId = authData.user.id;
+      }
     }
 
     const { error: profileError } = await db
       .from('staff_users')
       .insert({
+        ...(authId ? { auth_id: authId } : {}),
         name: params.name,
         email: params.email.trim(),
         phone: params.phone,
@@ -174,6 +191,7 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     setState({ user: null, staffProfile: null, loading: false, error: null });
+    window.dispatchEvent(new Event('auth-changed'));
   }, []);
 
   const isAdmin = state.staffProfile?.role === 'admin';
