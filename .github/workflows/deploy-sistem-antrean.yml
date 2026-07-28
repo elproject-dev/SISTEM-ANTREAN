@@ -37,8 +37,8 @@ jobs:
       - name: Build sistem-antrean
         run: pnpm -F sistem-antrean exec vite build
         env:
-          VITE_SUPABASE_URL: https://wnozfcqgcmvxvkxbxgfj.supabase.co
-          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indub3pmY3FnY212eHZreGJ4Z2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNDIwMjMsImV4cCI6MjA5ODkxODAyM30.00v4HUxsKgNxupMPdWMo6XeWxWKrX7B7qRXhoh1cttg
+          VITE_SUPABASE_URL: https://adjzrdfzarseqdbenxhq.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkanpyZGZ6YXJzZXFkYmVueGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTA0NzQsImV4cCI6MjEwMDc4NjQ3NH0.ibwxubIst_LbH1nsifT2PojovY8QJ-i_5ilWPFugtpE
 
       - name: Generate 404.html for SPA routing
         run: cp apps/sistem-antrean/dist/index.html apps/sistem-antrean/dist/404.html
