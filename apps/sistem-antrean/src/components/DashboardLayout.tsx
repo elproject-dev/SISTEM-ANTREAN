@@ -155,7 +155,7 @@ export function DashboardLayout({ route, children }: DashboardLayoutProps) {
           <div className="p-2 flex-shrink-0 relative">
             <div className="flex items-center justify-center cursor-pointer transition-transform hover:scale-105" title="Admin">
               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden border border-white/50">
-                <img src="/check.png" alt="Profile" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}check.png`} alt="Profile" className="w-full h-full object-cover" />
               </div>
             </div>
           </div>

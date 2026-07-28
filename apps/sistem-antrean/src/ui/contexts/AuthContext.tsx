@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import {
-  AuthUser,
+  type AuthUser,
   loginWithSupabase,
   registerWithSupabase,
   logoutAuth,
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data } = await supabase.from('staff').select('*').ilike('email', sessionUser.email).single();
           
           // Force admin role for root email
-          if (sessionUser.email === 'sbagiamu.pos@gmail.com') {
+          if (sessionUser.email === 'elproject.dev@gmail.com') {
              sessionUser.role = 'admin';
              if (data) {
                 if (data.name) sessionUser.name = data.name;
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
 
               // Cek update role (kecuali superadmin)
-              if (updatedStaff.role && newUser.role !== updatedStaff.role && newUser.email !== 'sbagiamu.pos@gmail.com') {
+              if (updatedStaff.role && newUser.role !== updatedStaff.role && newUser.email !== 'elproject.dev@gmail.com') {
                 newUser.role = updatedStaff.role;
                 changed = true;
               }
@@ -170,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase.from('staff').select('*').ilike('email', authUser.email).single();
       
       // Force admin role for root email
-      if (authUser.email === 'sbagiamu.pos@gmail.com') {
+      if (authUser.email === 'elproject.dev@gmail.com') {
          authUser.role = 'admin';
          if (data) {
            if (data.name) authUser.name = data.name;

@@ -46,7 +46,7 @@ export function PageHeaderCard({ title, subtitle, children, showProfile = true }
               >
                 <div className={`absolute inset-0 rounded-full animate-ping opacity-40 ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                 <div className={`relative z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-md border-2 overflow-hidden bg-white ${isOnline ? 'border-emerald-500' : 'border-red-500'}`}>
-                  <img src="/check.png" alt="Profile" className="w-full h-full object-cover" />
+                  <img src={`${import.meta.env.BASE_URL}check.png`} alt="Profile" className="w-full h-full object-cover" />
                 </div>
               </button>
             </PopoverTrigger>
