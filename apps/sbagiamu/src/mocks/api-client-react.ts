@@ -438,8 +438,9 @@ export const useGetRevenueChart = (params?: any) => {
   const fetchRevenueData = async () => {
     setIsLoading(true);
     try {
+      const daysCount = params?.daysCount || 7;
       let chartStart = new Date();
-      chartStart.setDate(chartStart.getDate() - 6);
+      chartStart.setDate(chartStart.getDate() - (daysCount - 1));
       chartStart.setHours(0, 0, 0, 0);
       let chartEnd = new Date();
       chartEnd.setHours(23, 59, 59, 999);
@@ -448,9 +449,9 @@ export const useGetRevenueChart = (params?: any) => {
         chartStart = params?.startDate ? new Date(params.startDate + "T00:00:00") : new Date(params.endDate + "T00:00:00");
         chartEnd = params?.endDate ? new Date(params.endDate + "T00:00:00") : new Date(params.startDate + "T00:00:00");
 
-        // If only end date, set start to 6 days prior to show a week
+        // If only end date, set start to daysCount-1 days prior
         if (!params?.startDate && params?.endDate) {
-          chartStart.setDate(chartStart.getDate() - 6);
+          chartStart.setDate(chartStart.getDate() - (daysCount - 1));
         }
 
         chartStart.setHours(0, 0, 0, 0);
@@ -986,8 +987,9 @@ export const useListTransactions = (params?: any) => {
 
   // Realtime subscription for new transactions
   useEffect(() => {
+    const channelName = `transactions_list_realtime_${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel('transactions_list_realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -1011,10 +1013,11 @@ export const useListTransactions = (params?: any) => {
     queryKey: ['transactions', params],
     queryFn: async () => {
       // First, get total count and total amount with the same filters (but no limit/offset)
+      let countSelect = 'subtotal, tax, discount, points_used';
       let countQuery = applyTenantFilter(
         supabase
           .from('transactions')
-          .select('subtotal, tax, discount, points_used', { count: 'exact' })
+          .select(countSelect, { count: 'exact' })
       );
 
       if (params?.paymentMethod) {
@@ -1037,6 +1040,15 @@ export const useListTransactions = (params?: any) => {
         countQuery = countQuery.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       }
 
+      if (params?.transactionSearch) {
+        const searchId = parseInt(params.transactionSearch.replace(/\D/g, ''));
+        if (!isNaN(searchId)) {
+          countQuery = countQuery.eq('id', searchId);
+        } else {
+          countQuery = countQuery.eq('id', -1); // Impossible ID if no digits
+        }
+      }
+
       const { data: summaryData, count, error: countError } = await countQuery;
       if (countError) throw countError;
 
@@ -1046,10 +1058,11 @@ export const useListTransactions = (params?: any) => {
       }, 0);
 
       // Then fetch paginated data
+      let dataSelect = '*, transaction_items(*), customers(name, membership_type, points), outlets(name, store_name, address, phone)';
       let dataQuery = applyTenantFilter(
         supabase
           .from('transactions')
-          .select('*, transaction_items(*), customers(name, membership_type, points), outlets(name, store_name, address, phone)')
+          .select(dataSelect)
           .order('created_at', { ascending: false })
       );
 
@@ -1079,6 +1092,15 @@ export const useListTransactions = (params?: any) => {
         start.setHours(0, 0, 0, 0);
         end.setHours(23, 59, 59, 999);
         dataQuery = dataQuery.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+      }
+
+      if (params?.transactionSearch) {
+        const searchId = parseInt(params.transactionSearch.replace(/\D/g, ''));
+        if (!isNaN(searchId)) {
+          dataQuery = dataQuery.eq('id', searchId);
+        } else {
+          dataQuery = dataQuery.eq('id', -1);
+        }
       }
 
       const { data, error } = await dataQuery;

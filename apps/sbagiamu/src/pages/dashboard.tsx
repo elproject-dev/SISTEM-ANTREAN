@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useGetDashboardStats, useGetTopProducts, useGetRecentTransactions, useGetRevenueChart, useHealthCheck, useListTransactions, useGetCashierNames, useListOutlets, useListStaff, useAdvancedAnalytics } from "@workspace/api-client-react";
+import { useGetDashboardStats, useGetTopProducts, useGetRecentTransactions, useGetRevenueChart, useHealthCheck, useListTransactions, useListProducts, useGetCashierNames, useListOutlets, useListStaff, useAdvancedAnalytics } from "@workspace/api-client-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { getProductImageUrl } from "@/lib/supabase-storage";
 import { formatRupiah } from "@/lib/formatters";
-import { Activity, CreditCard, DollarSign, Package, Users, BarChart3, ShieldCheck, FileDown, Download, ChevronRight, WifiOff, Building2, UserCircle, LayoutDashboard, Crown, Star, TrendingUp, History, LogOut } from "lucide-react";
+import { Activity, CreditCard, DollarSign, Package, Users, BarChart3, ShieldCheck, FileDown, Download, ChevronRight, WifiOff, Building2, UserCircle, LayoutDashboard, Crown, Star, TrendingUp, History, LogOut, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DownloadExcelDialog, mapApiTransactionsToExport } from "@/components/excel-export";
@@ -21,12 +21,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, CalendarRange, SlidersHorizontal, Clock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Online/Offline state
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -175,16 +177,84 @@ export default function DashboardPage() {
   }, [tempOutletFilter, filterStaffList]);
 
   // Bundle all filter parameters including date range
-  const filterParams = { cashierFilter, outletFilter, paymentMethodFilter, startDate, endDate, memberProductOutletFilter, memberProductDayFilter, generalProductOutletFilter, generalProductDayFilter, hourlyOutletFilter, hourlyDayFilter, outletPerformanceDayFilter, topCustomersOutletFilter };
+  const filterParams = { cashierFilter, outletFilter, paymentMethodFilter, startDate, endDate, memberProductOutletFilter, memberProductDayFilter, generalProductOutletFilter, generalProductDayFilter, hourlyOutletFilter, hourlyDayFilter, outletPerformanceDayFilter, topCustomersOutletFilter, daysCount: isMobile ? 7 : 14 };
 
   const { data: stats } = useGetDashboardStats(filterParams);
-  // Get all transactions for Excel export (without outlet filter)
-  const { data: allTransactions } = useListTransactions({ limit: 10000, cashierFilter: "all", outletFilter: "all" });
+  // Get all transactions for Excel export (respecting global date filters)
+  const { data: allTransactions } = useListTransactions({
+    limit: 10000,
+    cashierFilter: "all",
+    outletFilter: "all",
+    startDate,
+    endDate
+  });
   const { data: topProducts } = useGetTopProducts(filterParams);
   const { data: recentTransactions } = useGetRecentTransactions(filterParams);
   const { data: revenueChart } = useGetRevenueChart(filterParams);
   const { data: health } = useHealthCheck();
   const { data: advancedAnalytics } = useAdvancedAnalytics(filterParams);
+
+  const [productAnalysisStartDate, setProductAnalysisStartDate] = useState("");
+  const [productAnalysisEndDate, setProductAnalysisEndDate] = useState("");
+  const [productAnalysisSearch, setProductAnalysisSearch] = useState("");
+
+  const { data: productAnalysisTransactions } = useListTransactions({
+    limit: 10000,
+    cashierFilter: "all",
+    outletFilter: "all",
+    startDate: productAnalysisStartDate || startDate,
+    endDate: productAnalysisEndDate || endDate
+  });
+
+  const { data: allProductsData } = useListProducts({ limit: 5000 });
+
+  const productAnalysisResult = useMemo(() => {
+    if (!productAnalysisSearch || !productAnalysisTransactions) return null;
+    const searchLower = productAnalysisSearch.toLowerCase();
+    let qty = 0;
+    let revenue = 0;
+    let trxCount = 0;
+    let imageUrl: string | null = null;
+
+    productAnalysisTransactions.forEach((trx: any) => {
+      let foundInTrx = false;
+      trx.transaction_items?.forEach((item: any) => {
+        if (item.product_name?.toLowerCase().includes(searchLower)) {
+          qty += Number(item.quantity) || 0;
+          revenue += Number(item.subtotal) || 0;
+          foundInTrx = true;
+        }
+      });
+      if (foundInTrx) trxCount++;
+    });
+
+    // Find image URL from allProductsData
+    if (allProductsData) {
+      const matchedProduct = allProductsData.find((p: any) => p.name.toLowerCase() === searchLower);
+      if (matchedProduct && matchedProduct.image_url) {
+        imageUrl = matchedProduct.image_url;
+      }
+    }
+
+    return { qty, revenue, trxCount, search: productAnalysisSearch, imageUrl };
+  }, [productAnalysisSearch, productAnalysisTransactions, allProductsData]);
+
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const uniqueProducts = useMemo(() => {
+    if (!productAnalysisTransactions) return [];
+    const productNames = new Set<string>();
+    productAnalysisTransactions.forEach((trx: any) => {
+      trx.transaction_items?.forEach((item: any) => {
+        if (item.product_name) productNames.add(item.product_name);
+      });
+    });
+    return Array.from(productNames).sort();
+  }, [productAnalysisTransactions]);
+
+  const filteredProductSuggestions = useMemo(() => {
+    if (!productAnalysisSearch) return uniqueProducts;
+    return uniqueProducts.filter(p => p.toLowerCase().includes(productAnalysisSearch.toLowerCase()));
+  }, [uniqueProducts, productAnalysisSearch]);
 
   // Auto-scroll to peak hour when data loads
   useEffect(() => {
@@ -212,9 +282,9 @@ export default function DashboardPage() {
   // Check font size for responsive layout adjustments
   const currentFontSize = typeof window !== 'undefined' ? localStorage.getItem('fontSize') || 'small' : 'small';
 
-  const chartData = revenueChart || Array.from({ length: 7 }).map((_, i) => {
+  const chartData = revenueChart || Array.from({ length: isMobile ? 7 : 14 }).map((_, i) => {
     const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
+    d.setDate(d.getDate() - ((isMobile ? 6 : 13) - i));
     return { date: d.toISOString(), revenue: 0, transactions: 0 };
   });
   const chartMaxRevenue = Math.max(...chartData.map((point) => point.revenue || 0), 0);
@@ -385,7 +455,7 @@ export default function DashboardPage() {
                       </div>
                     </>
                   )}
-                  
+
                   {/* Payment Method Filter */}
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-slate-500">Metode Pembayaran</Label>
@@ -417,9 +487,9 @@ export default function DashboardPage() {
             </Popover>
 
             {/* Profile Photo - Clickable Popover */}
-            <button 
+            <button
               onClick={() => setIsProfileOpen(true)}
-              className="relative inline-flex items-center justify-center shrink-0 border-0 bg-transparent p-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-full transition-transform hover:scale-105" 
+              className="relative inline-flex items-center justify-center shrink-0 border-0 bg-transparent p-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-full transition-transform hover:scale-105"
               title="Profil Pengguna"
             >
               <div className={`absolute inset-0 rounded-full animate-ping opacity-40 ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
@@ -578,8 +648,8 @@ export default function DashboardPage() {
                       dataKey="revenue"
                       fill="url(#colorRevenue)"
                       radius={[6, 6, 0, 0]}
-                      barSize={32}
-                      maxBarSize={48}
+                      barSize={isMobile ? 32 : 40}
+                      maxBarSize={isMobile ? 48 : 64}
                       activeBar={{ fill: 'url(#colorRevenueHover)' }}
                     />
                   </BarChart>
@@ -1224,6 +1294,157 @@ export default function DashboardPage() {
 
             </div>
 
+            {/* Product Analysis Card */}
+            <div className="mt-4 sm:mt-6 mb-6">
+              <Card className="shadow-lg border-0 bg-white dark:bg-slate-900">
+                <CardHeader className="pb-3 px-4 pt-4 border-b border-slate-100 dark:border-slate-800">
+                  <CardTitle className="text-slate-700 dark:text-slate-200 text-sm sm:text-base font-medium flex items-center gap-2">
+                    <Package className="w-4 h-4 text-slate-400" />
+                    <span>Analisa Produk Terpilih</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                    <div className="w-full sm:w-1/2">
+                      <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <Label className="text-xs font-medium text-slate-500">Rentang Tanggal (Khusus Analisa Produk)</Label>
+                          {(productAnalysisStartDate || productAnalysisEndDate || productAnalysisSearch) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProductAnalysisStartDate("");
+                                setProductAnalysisEndDate("");
+                                setProductAnalysisSearch("");
+                              }}
+                              className="text-[10px] text-primary hover:underline"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-center gap-2 w-full">
+                          <div className="relative w-full h-9">
+                            <Input
+                              type="text"
+                              placeholder="Tanggal Mulai"
+                              value={productAnalysisStartDate ? productAnalysisStartDate.split('-').reverse().join('-') : ""}
+                              readOnly
+                              className="absolute inset-0 h-9 w-full rounded-md text-sm text-center bg-transparent focus:ring-0 cursor-pointer"
+                            />
+                            <input
+                              type="date"
+                              value={productAnalysisStartDate}
+                              onChange={(e: any) => setProductAnalysisStartDate(e.target.value)}
+                              onClick={(e: any) => {
+                                try { e.target.showPicker?.(); } catch (err) { }
+                              }}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              title="Tanggal Mulai"
+                            />
+                          </div>
+                          <span className="text-slate-400 text-sm hidden sm:block">-</span>
+                          <div className="relative w-full h-9">
+                            <Input
+                              type="text"
+                              placeholder="Tanggal Akhir"
+                              value={productAnalysisEndDate ? productAnalysisEndDate.split('-').reverse().join('-') : ""}
+                              readOnly
+                              className="absolute inset-0 h-9 w-full rounded-md text-sm text-center bg-transparent focus:ring-0 cursor-pointer"
+                            />
+                            <input
+                              type="date"
+                              value={productAnalysisEndDate}
+                              onChange={(e: any) => setProductAnalysisEndDate(e.target.value)}
+                              onClick={(e: any) => {
+                                try { e.target.showPicker?.(); } catch (err) { }
+                              }}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              title="Tanggal Akhir"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <Label className="text-xs font-medium text-slate-500 mb-2 block">Pencarian Nama Produk</Label>
+                      <div className="relative w-full">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <Input
+                            placeholder="Cari atau pilih produk..."
+                            value={productAnalysisSearch}
+                            onChange={(e: any) => setProductAnalysisSearch(e.target.value)}
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                            className="h-10 pl-9"
+                          />
+                        </div>
+                        {isSearchFocused && productAnalysisSearch.length >= 3 && filteredProductSuggestions.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filteredProductSuggestions.map((product, idx) => (
+                              <div
+                                key={idx}
+                                className="px-3 py-2 text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+                                onClick={() => {
+                                  setProductAnalysisSearch(product);
+                                  setIsSearchFocused(false);
+                                }}
+                              >
+                                {product}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-slate-400 mt-2">
+                        Hasil analisa berdasarkan rentang tanggal: {(productAnalysisStartDate || productAnalysisEndDate) ? `${productAnalysisStartDate ? productAnalysisStartDate.split('-').reverse().join('-') : "..."} s/d ${productAnalysisEndDate ? productAnalysisEndDate.split('-').reverse().join('-') : "..."}` : startDate || endDate ? `${startDate ? startDate.split('-').reverse().join('-') : "..."} s/d ${endDate ? endDate.split('-').reverse().join('-') : "..."}` : "Semua waktu"}
+                      </p>
+                    </div>
+
+                    <div className="w-full sm:w-1/2">
+                      {productAnalysisSearch ? (
+                        <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
+                          <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-200 dark:border-slate-700">
+                            <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                              {productAnalysisResult?.imageUrl ? (
+                                <img
+                                  src={getProductImage(productAnalysisResult.imageUrl) || ""}
+                                  alt={productAnalysisResult.search}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <Package className="w-6 h-6 text-slate-400" />
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-tight">
+                              Hasil untuk <br /><span className="text-sm text-slate-800 dark:text-slate-200 font-bold">"{productAnalysisResult?.search}"</span>
+                            </p>
+                          </div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-slate-600 dark:text-slate-300">Total Terjual</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100">{productAnalysisResult?.qty || 0} item</span>
+                          </div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-slate-600 dark:text-slate-300">Jumlah Transaksi</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100">{productAnalysisResult?.trxCount || 0} transaksi</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Total Nilai</span>
+                            <span className="font-bold text-primary">{formatRupiah(productAnalysisResult?.revenue || 0)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-full min-h-[100px] flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                          <p className="text-xs sm:text-sm text-slate-400 text-center px-4">Ketik nama produk untuk melihat analisa penjualan di rentang tanggal ini.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Grafik Jam Sibuk */}
             {advancedAnalytics?.hourlyAnalytics && advancedAnalytics.hourlyAnalytics.length > 0 && (() => {
               // Find peak hour index
@@ -1364,6 +1585,7 @@ export default function DashboardPage() {
             })()}
           </div>
         )}
+
 
         {/* Download Report Card */}
         <div className="mt-6 mb-0">

@@ -92,11 +92,6 @@ export function AntreanPage() {
     }
   };
 
-  const handleAssign = async (ticketId: string, operatorId: string) => {
-    await assignTicketToOperator(ticketId, operatorId);
-    setShowSuccess('✅ Tiket berhasil ditugaskan ke loket!');
-    setTimeout(() => setShowSuccess(''), 3000);
-  };
 
   const allTickets = state.tickets;
   const filteredTickets = allTickets.filter(t => {

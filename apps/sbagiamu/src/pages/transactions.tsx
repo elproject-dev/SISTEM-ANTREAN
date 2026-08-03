@@ -69,6 +69,7 @@ export default function TransactionsPage() {
   const [cashiers, setCashiers] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [transactionSearch, setTransactionSearch] = useState<string>("");
 
   // Check if user is admin super
   const { user } = useAuth();
@@ -83,6 +84,7 @@ export default function TransactionsPage() {
     cashierFilter: cashierFilter === "all" ? undefined : cashierFilter,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
+    transactionSearch: transactionSearch || undefined,
     limit: 30,
     offset: (page - 1) * ITEMS_PER_PAGE
   });
@@ -199,6 +201,18 @@ export default function TransactionsPage() {
               <PopoverContent align="end" className="w-[340px] max-w-[95vw] sm:w-[400px] p-4 sm:rounded-2xl shadow-xl">
                 <div className="space-y-4">
                   <div className="font-semibold text-sm mb-2">Filter Data</div>
+
+                  {/* Transaction Search */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-500">Pencarian Nomor Transaksi</label>
+                    <Input
+                      type="text"
+                      placeholder="Cari ID Transaksi..."
+                      value={transactionSearch}
+                      onChange={(e: any) => { setTransactionSearch(e.target.value); setPage(1); }}
+                      className="h-9 w-full text-sm"
+                    />
+                  </div>
 
                   {/* Date Filters */}
                   <div className="space-y-2">

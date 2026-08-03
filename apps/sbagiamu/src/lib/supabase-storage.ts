@@ -269,7 +269,7 @@ export const deleteProductImage = async (filePath: string): Promise<DeleteRespon
 /**
  * Get public URL dari file path dengan opsi transformasi
  */
-export const getProductImageUrl = (filePath: string, options?: { width?: number; height?: number; quality?: number }): string => {
+export const getProductImageUrl = (filePath: string, _options?: { width?: number; height?: number; quality?: number }): string => {
   if (!filePath) {
     return '';
   }
@@ -280,13 +280,7 @@ export const getProductImageUrl = (filePath: string, options?: { width?: number;
 
   const { data } = supabase.storage
     .from(BUCKET_NAME)
-    .getPublicUrl(filePath, options ? {
-      transform: {
-        width: options.width,
-        height: options.height,
-        quality: options.quality || 80,
-      }
-    } : undefined);
+    .getPublicUrl(filePath);
 
   if (!data?.publicUrl) {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

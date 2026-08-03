@@ -2,14 +2,15 @@
  * Versi aplikasi SBAGIAMU POS
  * Update nilai ini setiap kali rilis versi baru
  */
-export const APP_VERSION = '1.0.31';
+export const APP_VERSION = '1.0.33';
 
 /**
  * Catatan rilis untuk versi ini (Changelog)
  * Update daftar ini sebelum menjalankan "npm run release"
  */
 export const RELEASE_CHANGELOG = [
-  "Penambahan Fungsi Total Transaksi Di Riwayat."
+  "penambahan fitur filter produk",
+  "perubahan grafik batang di dekstop"
 ];
 
 /**

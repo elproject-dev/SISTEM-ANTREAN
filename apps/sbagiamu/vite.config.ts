@@ -1,10 +1,57 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   base: process.env.GITHUB_PAGES ? "/SBAGIAMU/" : "/",
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      devOptions: {
+        enabled: true,
+      },
+      includeAssets: ['favicon.svg', 'pwa-icon.png'],
+      manifest: {
+        name: 'SBAGIAMU POS',
+        short_name: 'SBAGIAMU',
+        description: 'Aplikasi Point of Sales SBAGIAMU',
+        theme_color: '#000000',
+        background_color: '#ffffff',
+        display: 'standalone',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          {
+            src: 'pwa-icon.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-icon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-icon.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
+          {
+            src: 'pwa-icon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ]
+      }
+    })
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
@@ -59,6 +106,9 @@ export default defineConfig({
     host: "0.0.0.0",
     open: true,
     strictPort: true,
+    watch: {
+      ignored: ['**/src-tauri/target/**'],
+    },
     allowedHosts: [
       "directed-zigzagged-haunt.ngrok-free.dev",
       ".ngrok-free.dev",

@@ -52,9 +52,30 @@ async function runDesktopRelease() {
         }
     });
 
-    // 3. Temukan file installer dan signature
-    const bundleDir = path.resolve(__dirname, '../src-tauri/target/release/bundle/nsis');
-    const installerFileName = `Sbagiamu_${version}_x64-setup.exe`;
+    // 3. Temukan file installer dan signature berdasarkan OS
+    const isWindows = process.platform === 'win32';
+    const isMac = process.platform === 'darwin';
+    
+    let bundleDir, installerFileName, platformKey, contentType;
+
+    if (isWindows) {
+      bundleDir = path.resolve(__dirname, '../src-tauri/target/release/bundle/nsis');
+      installerFileName = `Sbagiamu_${version}_x64-setup.exe`;
+      platformKey = "windows-x86_64";
+      contentType = 'application/vnd.microsoft.portable-executable';
+    } else if (isMac) {
+      bundleDir = path.resolve(__dirname, '../src-tauri/target/release/bundle/dmg');
+      installerFileName = `Sbagiamu_${version}_x64.dmg`;
+      platformKey = "darwin-x86_64";
+      contentType = 'application/x-apple-diskimage';
+    } else {
+      // Linux
+      bundleDir = path.resolve(__dirname, '../src-tauri/target/release/bundle/appimage');
+      installerFileName = `Sbagiamu_${version}_amd64.AppImage`;
+      platformKey = "linux-x86_64";
+      contentType = 'application/x-executable';
+    }
+
     const installerPath = path.join(bundleDir, installerFileName);
     const sigPath = installerPath + '.sig';
 
@@ -84,7 +105,7 @@ async function runDesktopRelease() {
     const { error: uploadError } = await supabase.storage
       .from('app-releases')
       .upload(`desktop/${installerFileName}`, zipBuffer, {
-        contentType: 'application/vnd.microsoft.portable-executable',
+        contentType: contentType,
         upsert: true
       });
 
@@ -105,7 +126,7 @@ async function runDesktopRelease() {
         notes: changelogArray.join('\n'),
         pub_date: new Date().toISOString(),
         platforms: {
-            "windows-x86_64": {
+            [platformKey]: {
                 signature: signature,
                 url: downloadUrl
             }
