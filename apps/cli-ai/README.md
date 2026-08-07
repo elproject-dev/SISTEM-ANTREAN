@@ -168,5 +168,5 @@ Project ini dilisensikan di bawah lisensi **ISC**.
 ---
 
 <div align="center">
-  <i>Dibuat dengan ❤️ oleh <b>ELPROJECT</b> & Komunitas</i>
+  <i>Powered by <b>ELPROJECT</b> & <b>Ai kesayangan</b></i>
 </div>
