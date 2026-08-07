@@ -14,7 +14,7 @@
 
 Kompatibel secara native dengan API bergaya OpenAI/OmniRoute (OpenAI, Ollama, LocalAI, vLLM, DeepSeek, dsb).
 
-## ✨ Fitur Utama
+## Fitur Utama
 
 - **Konsep Workspace Trust (Keamanan Tingkat Tinggi)** — Layaknya VS Code, AI hanya diizinkan mengeksekusi aksi file jika direktori saat ini telah disetujui (Trusted / Session / Restricted).
 - **Agentic Code Agent** — Mendukung modifikasi dan analisis kode mandiri dengan built-in tools: `write_file`, `read_file`, `list_dir`, `grep_search`, `patch_file`, dan `run_command`.
@@ -30,34 +30,49 @@ Kompatibel secara native dengan API bergaya OpenAI/OmniRoute (OpenAI, Ollama, Lo
 
 ## 🚀 Instalasi & Konfigurasi
 
+Aplikasi ini telah dipublikasikan ke NPM, sehingga Anda dapat menjalankannya langsung atau menginstalnya secara global di sistem Anda.
+
 ### Prasyarat
 
 - **Node.js** versi 18 atau lebih baru (direkomendasikan versi LTS).
 - Koneksi ke server AI (OpenAI, OmniRoute Gateway, Ollama, LocalAI, dll).
 
-### Langkah Instalasi
+### Opsi 1: Menjalankan Langsung Tanpa Install (Rekomendasi)
+Anda dapat langsung menjalankan CLI ini menggunakan `npx`. Ini akan selalu menggunakan versi terbaru dari NPM.
+```bash
+npx aicli-omniroute
+```
 
-1. **Clone repositori dan masuk ke direktori**:
+### Opsi 2: Install Global
+Jika Anda ingin perintah `aicli` (atau `aicli-omniroute`) terinstal permanen di laptop Anda:
+```bash
+npm install -g aicli-omniroute
+```
+Setelah terinstal, Anda dapat menjalankannya kapan saja dari direktori mana pun dengan mengetik:
+```bash
+aicli-omniroute
+# atau
+npx aicli-omniroute
+```
+
+### Opsi 3: Build dari Source Code (Untuk Developer)
+
+1. **Clone repositori**:
    ```bash
    git clone https://github.com/elproject-dev/Aicli_Omniroute_CodeCli.git
    cd Aicli_Omniroute_CodeCli
    ```
 
-2. **Install dependensi**:
+2. **Install dependensi & Kompilasi**:
    ```bash
    npm install
-   ```
-
-3. **Kompilasi TypeScript**:
-   ```bash
    npm run build
    ```
 
-4. **Link secara global (Opsional)**:
+3. **Link secara global (Opsional)**:
    ```bash
    npm link
    ```
-   *Setelah di-link, Anda bisa menggunakan perintah `aicli` langsung dari mana saja.*
 
 ---
 
